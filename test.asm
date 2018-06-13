@@ -12,12 +12,11 @@
     ;* These will contain printable chars of mins, secs and msecs
     results db "0000$"
 
-    is_visible db 1
-    secs_elapsed_visible db 0
     ;NOTE: 34 = ascii for double quotes char
     quote db 34, "Computers are good at following instructions, but not at reading your mind.", 34, 0Ah, 0Dh
           db "- Donald Knuth$"
-    
+    empty db "                                                                                                                                                                      ", 0Ah, 0Dh
+          db "                                                                                                                                                                     $"
 .code
 START:
     mov ax, @data
@@ -42,29 +41,42 @@ START:
     sti
 
     mov ax, @data
-    mov ds, ax
+    mov ds, ax   
+    mov di, offset quote 
+    call PRINT_DI
 
-    PRINT_MESSAGE:
-        mov dx, offset quote
-        mov ah, 09h
-        int 21h
-        mov cx, 0FFFF
-        mov secs_start, secs
-        WAIT_TEN_SECONDS:
-            mov ax, secs
-            mov bx, secs_start
-            sub bx, ax
-            jl check_greater_than_fifty
-                cmp bx, 10d
-                jg TEN_SECONDS_ELAPSED
-                jmp WAIT_TEN_SECONDS
-            check_greater_than_fifty:
-                cmp bx, -50d
-                jg TEN_SECONDS_ELAPSED
-                jmp WAIT_TEN_SECONDS
-    cmp al, -50d
-    jg ten_seconds_passed
-    jmp PRINT_MESSAGE
+MAIN:
+    mov di, offset quote 
+    call PRINT_DI
+    mov cx, 01DDDh    
+    WASTE_TEN:
+        push cx
+        WASTE_TEN_IN:
+            loop WASTE_TEN_IN
+        pop cx
+        loop WASTE_TEN
+    mov di, offset empty
+    call PRINT_DI
+    mov cx, 09FFh
+    WASTE_ONE:
+        push cx
+        WASTE_ONE_IN:
+            loop WASTE_ONE_IN
+        pop cx
+        loop WASTE_ONE
+    jmp MAIN
+
+PRINT_DI PROC NEAR uses ax bx cx dx 
+    mov ah, 2
+    mov bh, 0
+    mov dh, 0
+    mov dl, 0
+    int 10h
+    mov dx, di
+    mov ah, 09h
+    int 21h
+    ret
+PRINT_DI ENDP
 
 set_results PROC NEAR
     push ax
@@ -90,7 +102,7 @@ set_results PROC NEAR
     ret
 set_results ENDP
 
-MY_CLOCK_INT:
+MY_CLOCK_INT PROC NEAR uses ax bx cx dx 
     pushf
     call dword ptr [Old_int_off]
     ;* According to documnetation, the clock updates 18.2 times per second
@@ -99,46 +111,47 @@ MY_CLOCK_INT:
     add msecs, 55d
     cmp msecs, 1000d
     jb PRINT_TIMER
-    inc secs
-    sub msecs, 1000d
-    cmp secs, 60d
-    jb PRINT_TIMER
-    inc mins
-    sub secs, 60d
-PRINT_TIMER:
-    ;set cursor to middle of screen
-    mov ah, 2
-    mov bh, 0
-    mov dh, 12
-    mov dl, 40
-    int 10h
-    ;* update timer
-    ;update mins
-    mov ax, mins
-    call set_results
-    ;print mins
-    mov dx, offset results
-    mov ah, 09h
-    int 21h
-    mov dl, ":"
-    mov ah, 2h
-    int 21h
-    ;update secs
-    mov ax, secs
-    call set_results
-    ;print seconds
-    mov dx, offset results
-    mov ah, 09h
-    int 21h
-    mov dl, ":"
-    mov ah, 2h
-    int 21h
-    ;update miliseconds
-    mov ax, msecs
-    call set_results
-    ;print miliseconds
-    mov dx, offset results
-    mov ah, 09h
-    int 21h
+        inc secs
+        sub msecs, 1000d
+        cmp secs, 60d
+        jb PRINT_TIMER
+            inc mins
+            sub secs, 60d
+    PRINT_TIMER:
+        ;set cursor to middle of screen
+        mov ah, 2
+        mov bh, 0
+        mov dh, 12
+        mov dl, 40
+        int 10h
+        ;* update timer
+        ;update mins
+        mov ax, mins
+        call set_results
+        ;print mins
+        mov dx, offset results
+        mov ah, 09h
+        int 21h
+        mov dl, ":"
+        mov ah, 2h
+        int 21h
+        ;update secs
+        mov ax, secs
+        call set_results
+        ;print seconds
+        mov dx, offset results
+        mov ah, 09h
+        int 21h
+        mov dl, ":"
+        mov ah, 2h
+        int 21h
+        ;update miliseconds
+        mov ax, msecs
+        call set_results
+        ;print miliseconds
+        mov dx, offset results
+        mov ah, 09h
+        int 21h
     iret
+MY_CLOCK_INT ENDP
 end START
